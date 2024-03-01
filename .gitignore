@@ -130,3 +130,6 @@ dmypy.json
 
 # Ignore output folder
 output/
+
+Miniconda3-latest-Linux-x86_64.sh
+yolov7/runs
