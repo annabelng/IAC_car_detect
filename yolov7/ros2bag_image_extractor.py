@@ -237,7 +237,7 @@ while reader.has_next():
             os.mkdir(output_directory)
 
         output_file_path = os.path.join(output_directory, 'Image' + '_' + '{0:010d}'.format(iterator[topic_name]) + '_' + str(msg.header.stamp.sec) + '_' + str(msg.header.stamp.nanosec) + '.jpg')
-        print(output_file_path)
+        #print(output_file_path)
         # Undistort Image before Saving
         if args.undistort:
             # If distortion parameters not loaded then load them once
@@ -252,8 +252,8 @@ while reader.has_next():
                 distortion_dict[topic_name[1:-6]] = yaml.safe_load(distortion_fp)
             cv2_msg = undistort(cv2_msg, distortion_dict[topic_name[1:-6]])
 
-        # Run detection on every fifth image
-        if counter % 5 == 0:
+        # Run detection on every twentieth image
+        if counter % 20 == 0:
             detection_output = detect_objects(args, cv2_msg, output_file_path)
             cars_count += detection_output
             
@@ -273,12 +273,15 @@ while reader.has_next():
         if cars_count % 50 == 0 and cars_count > 0:
             print(f"Processed cars {cars_count} Images")
 
+# check counters
+print("OUT OF LOOP")
 counter = counter / 5
-print("final car count is " + cars_count)
-print("final image count is " + counter)
+print("final car count is ", cars_count)
+print("final image count is ", counter)
 
+# calculate percentage 
 if cars_count / counter > 0.02:
-    # Write the ROSBag file path to a text file
+    # Write the rosbag file path to a text file
     with open("car_rosbag_paths.txt", "a") as file:
         file.write(ROSBAG_FILE_PATH + "\n")
     print("ROSBAG CONTAINS CARS")

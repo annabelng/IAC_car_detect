@@ -97,7 +97,7 @@ def detect(opt, img,img_path, save_img=False):
     # Inference
     t1 = time_synchronized()
     with torch.no_grad():   # Calculating gradients would cause a GPU memory leak
-        pred = model(img, augment=opt.augment)[0]
+        pred = model(img, augment=opt.augment)[0].cpu()
     t2 = time_synchronized()
 
     # Apply NMS
@@ -110,10 +110,6 @@ def detect(opt, img,img_path, save_img=False):
 
     # Process detections
     for i, det in enumerate(pred):  # detections per image
-        """if webcam:  # batch_size >= 1
-            p, s, im0, frame = path[i], '%g: ' % i, im0s[i].copy(), dataset.count
-        else:
-            p, s, im0, frame = path, '', im0s, img"""
         s, im0, frame = '', img, img
 
         #p = Path(p)  # to Path
@@ -122,6 +118,7 @@ def detect(opt, img,img_path, save_img=False):
         gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
         print("number of detections" + str(len(det)))
 
+        # set car flag
         car = False
         if len(det):
             # Rescale boxes from img_size to im0 size
@@ -129,13 +126,16 @@ def detect(opt, img,img_path, save_img=False):
 
             # Print results
             for c in det[:, -1].unique():
+                # check if car was detected 
                 if c == 0:
                     print("CAR DETECTED")
-                    sys.stdout.write("CAR DETECTED")
+                    # sys.stdout.write("CAR DETECTED")
                     car = True
+                    
                     return 1
-        else:
-            return 0
+    
+    return 0
+
 """
                 n = (det[:, -1] == c).sum()  # detections per class
                 s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
