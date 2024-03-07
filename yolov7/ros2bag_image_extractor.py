@@ -168,10 +168,10 @@ if args.compressed:
         '/vimba_front_right_center/image/compressed',
         '/vimba_front_left/image/compressed', 
         '/vimba_front_right/image/compressed',        
-        '/vimba_rear_left/image/compressed',       
-        '/vimba_rear_right/image/compressed',   
-        '/vimba_rear_left/image'            ,
-        '/vimba_rear_right/image'           ,
+        #'/vimba_rear_left/image/compressed',       
+        #'/vimba_rear_right/image/compressed',   
+        #'/vimba_rear_left/image'            ,
+        #'/vimba_rear_right/image'           ,
         '/vimba_front_left/image'           ,
         '/vimba_front_left_center/image'    ,
         '/vimba_front_right_center/image'   ,
@@ -179,8 +179,8 @@ if args.compressed:
     }
 else:
     image_topics = {
-        '/vimba_rear_left/image'            ,
-        '/vimba_rear_right/image'           ,
+        #'/vimba_rear_left/image'            ,
+        #'/vimba_rear_right/image'           ,
         '/vimba_front_left/image'           ,
         '/vimba_front_left_center/image'    ,
         '/vimba_front_right_center/image'   ,
@@ -256,7 +256,7 @@ while reader.has_next():
             cv2_msg = undistort(cv2_msg, distortion_dict[topic_name[1:-6]])
 
         # Run detection on every twentieth image
-        if counter % 5 == 0:
+        if counter % 20 == 0:
             detection_output = detect_objects(cv2_msg, WEIGHTS, output_file_path)
             cars_count += detection_output
             
@@ -278,15 +278,17 @@ while reader.has_next():
 
 # check counters
 print("OUT OF LOOP")
-counter = counter / 5
+counter = counter / 20
 print("final car count is ", cars_count)
 print("final image count is ", counter)
 
 # calculate percentage 
-if cars_count / counter > 0.02:
+if cars_count / counter > 0.05:
     # Write the rosbag file path to a text file
     with open("car_rosbag_paths.txt", "a") as file:
         file.write(ROSBAG_FILE_PATH + "\n")
+        file.write(f"Total images (every 20): {counter} \n")
+        file.write(f"Car images (every 20): {cars_count} \n")
     print("ROSBAG CONTAINS CARS")
 
 # Close the bag file

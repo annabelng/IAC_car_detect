@@ -1,0 +1,18 @@
+/mnt/nas/Archive_earlier_than_2024/Chris_short_bags/Rosbags/cars_on_left_side_test
+Total images (every 20): 439.45 
+Car images (every 20): 71 
+/mnt/nas/Archive_earlier_than_2024/Chris_short_bags/Rosbags/overtaken_from_right
+Total images (every 20): 1358.45 
+Car images (every 20): 465 
+/mnt/nas/Archive_earlier_than_2024/Chris_short_bags/Rosbags/overtake_yolov7_best
+Total images (every 20): 1059.55 
+Car images (every 20): 316 
+/mnt/nas/Archive_earlier_than_2024/Chris_short_bags/Rosbags/tent_calibration_short_rosbag2_2023_01_06-00_50_04
+Total images (every 20): 770.35 
+Car images (every 20): 568 
+/mnt/nas/Archive_earlier_than_2024/Chris_short_bags/Rosbags/Vegas_Calibration_rosbags/Chris_left_lidar_rl_camera
+Total images (every 20): 163.85 
+Car images (every 20): 52 
+/mnt/nas/Archive_earlier_than_2024/Chris_short_bags/Rosbags/Vegas_Calibration_rosbags/Chris_right_lidar_rr_camera
+Total images (every 20): 537.65 
+Car images (every 20): 41 

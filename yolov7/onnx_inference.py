@@ -41,7 +41,7 @@ def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleu
     return im, r, (dw, dh)
 
 # running detection with onnx yolo model 
-def detect(image, weights_path, output_file_path):
+def detect(img, weights_path, output_file_path):
     # load the model
     cuda = True
     w = weights_path
@@ -52,7 +52,7 @@ def detect(image, weights_path, output_file_path):
     colors = {name:[random.randint(0, 255) for _ in range(3)] for i,name in enumerate(names)}
 
     #img = cv2.cvtColor(img_path, cv2.COLOR_BGR2RGB)
-    #image = img.copy()
+    image = img.copy()
     image, ratio, dwdh = letterbox(image, auto=False)
     image = image.transpose((2, 0, 1))
     image = np.expand_dims(image, 0)
@@ -70,8 +70,9 @@ def detect(image, weights_path, output_file_path):
     outputs = session.run(outname, inp)[0]
 
     num_cars = 0
+    confidence = 0
 
-    ori_images = [image.copy()]
+    ori_images = [img.copy()]
 
     # image output and look at outputs 
     for i,(batch_id,x0,y0,x1,y1,cls_id,score) in enumerate(outputs):
@@ -80,6 +81,7 @@ def detect(image, weights_path, output_file_path):
         box -= np.array(dwdh*2)
         box /= ratio
         box = box.round().astype(np.int32).tolist()
+        print(box)
         cls_id = int(cls_id)
         print(cls_id)
         score = round(float(score),3)
@@ -89,8 +91,9 @@ def detect(image, weights_path, output_file_path):
         cv2.rectangle(image,box[:2],box[2:],color,2)
         cv2.putText(image,name,(box[0], box[1] - 2),cv2.FONT_HERSHEY_SIMPLEX,0.75,[225, 255, 255],thickness=2)
         
-        if cls_id == 0:
+        if cls_id == 0 and score > 0.6:
             num_cars += 1
+
 
     # save the images with bounding boxes
     print(output_file_path)
@@ -101,9 +104,9 @@ def detect(image, weights_path, output_file_path):
     
     # check number of cars
     if num_cars > 0:
-        image = np.transpose(image.squeeze(), (1,2,0))
+        #image = np.transpose(image.squeeze(), (1,2,0))
         print(image.shape)
-        if not cv2.imwrite(output_file_path, image):
+        if not cv2.imwrite(output_file_path, ori_images[0]):
             raise Exception("Could not write image")
         print(str(num_cars) + "CARS HAVE BEEN DETECTED")
         return 1
