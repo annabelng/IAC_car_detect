@@ -23,7 +23,8 @@ from rosidl_runtime_py.utilities import get_message
 
 
 # Now you can import the modules from the yolov7 folder
-from utils_detect import detect
+#from utils_detect import detect
+from onnx_inference import detect, letterbox
 
 # ---------------------------------------------------------------------------- #
 #                                   Functions                                  #
@@ -61,8 +62,8 @@ def undistort(input, distortion_data):
     return cv2.undistort(input, camera_matrix, distortion_matrix)
 
 # ------------------------------ Car Detection with YOLO ----------------------------- #
-def detect_objects(opt, cv_img, path):
-    num_cars = detect(opt, cv_img,path)
+def detect_objects(cv_img, weights_path, output_file_path):
+    num_cars = detect(cv_img, weights_path, output_file_path)
     return num_cars
 
 # ---------------------------------------------------------------------------- #
@@ -78,7 +79,8 @@ arg_parser.add_argument('-c', "--compressed", action="store_false")
 arg_parser.add_argument('-p', '--camera_info_path', help="Path to folder containing yaml config files for camera info for all cameras", type=dir_path)
 arg_parser.add_argument('-v', "--verbose", action="store_true")
 
-arg_parser.add_argument('--weights', nargs='+', type=str, default='yolov7/runs/best.pt', help='model.pt path(s)')
+arg_parser.add_argument('--weights', nargs='+', type=str, default='yolov7/runs/best.onnx', help='model.pt path(s)')
+"""
 arg_parser.add_argument('--source', type=str, default='inference/images', help='source')  # file/folder, 0 for webcam
 arg_parser.add_argument('--img-size', type=int, default=640, help='inference size (pixels)')
 arg_parser.add_argument('--conf-thres', type=float, default=0.25, help='object confidence threshold')
@@ -95,12 +97,13 @@ arg_parser.add_argument('--update', action='store_true', help='update all models
 arg_parser.add_argument('--project', default='runs/detect', help='save results to project/name')
 arg_parser.add_argument('--name', default='exp', help='save results to project/name')
 arg_parser.add_argument('--exist-ok', action='store_true', help='existing project/name ok, do not increment')
-arg_parser.add_argument('--no-trace', action='store_true', help='don`t trace model')
+arg_parser.add_argument('--no-trace', action='store_true', help='don`t trace model')"""
 
 # ------------------------------ Parse Arguments ----------------------------- #
 args = arg_parser.parse_args()
 
 OUTPUT_DIR  = args.output_dir
+WEIGHTS = args.weights
 
 # Check if output directory exists
 if os.path.exists(OUTPUT_DIR):
@@ -253,13 +256,13 @@ while reader.has_next():
             cv2_msg = undistort(cv2_msg, distortion_dict[topic_name[1:-6]])
 
         # Run detection on every twentieth image
-        if counter % 20 == 0:
-            detection_output = detect_objects(args, cv2_msg, output_file_path)
+        if counter % 5 == 0:
+            detection_output = detect_objects(cv2_msg, WEIGHTS, output_file_path)
             cars_count += detection_output
             
-            if detection_output == 1 and counter % 20 == 0:
+            """if detection_output == 1 and counter % 20 == 0:
                 if not cv2.imwrite(output_file_path, cv2_msg):
-                    raise Exception("Could not write image")
+                    raise Exception("Could not write image")"""
         counter += 1
         # print(counter)
 

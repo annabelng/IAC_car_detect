@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------- #
 #                               DEFAULT VARIABLES                              #
 # ---------------------------------------------------------------------------- #
-DATA_DIR_DEFAULT="/mnt/nas/Chris_short_bags/Rosbags/"
+DATA_DIR_DEFAULT="/mnt/nas/Archive_earlier_than_2024/Chris_short_bags/Rosbags/"
 VERBOSE_DEFAULT=0
 UNDISTORT_DEFAULT=0
 # CALIB_DIR_DEFAULT="/home/roar/ART/perception/Camera/Calibration_new/"

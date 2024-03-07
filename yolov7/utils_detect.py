@@ -173,4 +173,5 @@ def detect(opt, img,img_path, save_img=False):
 
     print(f'Done. ({time.time() - t0:.3f}s)')
     if car == True:
-        return 1"""
+        return 1
+"""
