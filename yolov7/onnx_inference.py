@@ -97,17 +97,13 @@ def detect(img, weights_path, output_file_path):
 
     # save the images with bounding boxes
     print(output_file_path)
-    """     
-    for i, img in enumerate(ori_images):
-        if not cv2.imwrite(output_file_path, img):
-            raise Exception("Could not write image")"""
+    print(image.shape)
+    if not cv2.imwrite(output_file_path, ori_images[0]):
+        raise Exception("Could not write image")
     
     # check number of cars
     if num_cars > 0:
-        #image = np.transpose(image.squeeze(), (1,2,0))
-        print(image.shape)
-        if not cv2.imwrite(output_file_path, ori_images[0]):
-            raise Exception("Could not write image")
+        #image = np.transpose(image.squeeze(), (1,2,0)
         print(str(num_cars) + "CARS HAVE BEEN DETECTED")
         return 1
     return 0

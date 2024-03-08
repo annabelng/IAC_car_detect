@@ -292,4 +292,25 @@ if cars_count / counter > 0.05:
     print("ROSBAG CONTAINS CARS")
 
 # Close the bag file
+output_video_path = os.path.join(OUTPUT_DIR, 'validation_video.mp4')
+input_video_path = os.path.join(OUTPUT_DIR, 'front_right_center')
+ffmpeg_command = [
+    "ffmpeg",
+    "-framerate", "20",
+    "-pattern_type", "glob",
+    "-i", f"{input_video_path}/*.jpg",
+    "-c:v", "libx264",
+    "-profile:v", "high",
+    "-crf", "20",
+    "-pix_fmt", "yuv420p",
+    output_video_path
+]
+
+try:
+    print("Creating video from masks...")
+    subprocess.run(ffmpeg_command, check=True)
+    print("Video created successfully:", output_video_path)
+except subprocess.CalledProcessError as e:
+    print("Failed to create video from masks:", e)
+
 del reader
