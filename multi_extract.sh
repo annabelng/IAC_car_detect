@@ -8,7 +8,7 @@ VERBOSE_DEFAULT=0
 UNDISTORT_DEFAULT=0
 # CALIB_DIR_DEFAULT="/home/roar/ART/perception/Camera/Calibration_new/"
 #CALIB_DIR_DEFAULT="/home/art-berk/IAC_dataset_maker/putnam_calib/"
-OUTPUT_BASE_DIR_DEFAULT="/home/annabelng/Desktop/rosbag_videos/"
+OUTPUT_BASE_DIR_DEFAULT="/home/annabelng/Desktop/rosbag_detections/"
 MAKE_VID_DEFAULT=1
 USE_COMPRESSED_DEFAULT=0
 
@@ -179,6 +179,9 @@ while IFS= read -r line; do
             fi
         fi
     fi
+    
+    # Cleanup: Delete all subfolders inside rosbag with images
+    find $OUTPUT_DIR -mindepth 1 -maxdepth 1 -type d -exec rm -rf {} +
 
     # --------------------- Convert Extracted Images to Video -------------------- #
     if [ ! -d "$OUTPUT_DIR" ] || [ -z "$(ls -A $OUTPUT_DIR)" ]; then # Check if the output directory is not empty first
@@ -199,4 +202,5 @@ while IFS= read -r line; do
 done < /tmp/tempfile.txt
 
 rm /tmp/tempfile.txt
+
 find $OUTPUT_BASE_DIR_DEFAULT -type d -empty -delete # Cleanup Empty Directories
