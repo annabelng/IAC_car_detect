@@ -1,8 +1,3 @@
-# ---------------------------------------------------------------------------- #
-#                                    Imports                                   #
-# ---------------------------------------------------------------------------- #
-
-# ------------------------- System related Libraries ------------------------- #
 import os
 import sys
 import argparse
@@ -207,88 +202,77 @@ if len(iterator) == 0:
 counter = 0
 cars_count = 0
 
-while reader.has_next():
-    
-    # Read the next message
-    topic_name, data, timestamp = reader.read_next()
-    
-    if topic_name in iterator.keys():
-        # Update iterator for this topic
-        iterator[topic_name] += 1
-
-        # Extract message from rosbag
-        msg_type = TYPE_MAP[topic_name]
-        msg_ser = get_message(msg_type)
-        msg = deserialize_message(data, msg_ser)
-        output_topic = None
-        if (args.compressed and msg_type == "sensor_msgs/msg/CompressedImage"):
-            np_arr = np.frombuffer(msg.data, np.uint8)
-            cv2_msg = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-            output_topic = topic_name[7:-17]
-        else:
-            # Convert to cv2 image
-            cv2_msg = bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-            output_topic = topic_name[1:-6]
-
-        # Create a directory for topic in output dir if it does not exist
-        # print("Output Topic: ", output_topic)
-        output_directory = os.path.join(OUTPUT_DIR, output_topic)
-        
+# Function to create output directories for topics
+def setup_output_directories(image_topics, output_dir):
+    output_directories = {}
+    for topic in image_topics:
+        # Format the output topic directory name
+        output_topic = topic[1:-6] if not args.compressed else topic[7:-17]
+        output_directory = os.path.join(output_dir, output_topic)
         if not os.path.exists(output_directory):
+            os.makedirs(output_directory, exist_ok=True)
             if args.verbose:
-                print("Creating Directory: ", output_directory)
-            os.mkdir(output_directory)
+                print(f"Created directory: {output_directory}")
+        output_directories[topic] = output_directory
+    return output_directories
 
-        output_file_path = os.path.join(output_directory, 'Image' + '_' + '{0:010d}'.format(iterator[topic_name]) + '_' + str(msg.header.stamp.sec) + '_' + str(msg.header.stamp.nanosec) + '.jpg')
-        #print(output_file_path)
-        # Undistort Image before Saving
-        if args.undistort:
-            # If distortion parameters not loaded then load them once
-            if topic_name[1:-6] not in distortion_dict:
-                yaml_file_path = args.camera_info_path + topic_name[1:-6] + '.yaml'
-                try:
-                    distortion_fp = open(file_path(yaml_file_path))
-                except:
-                    del reader
-                    print("[script] FATAL ERROR: Opening .yaml file failed. NOT A FILE")
-                    exit()
-                distortion_dict[topic_name[1:-6]] = yaml.safe_load(distortion_fp)
-            cv2_msg = undistort(cv2_msg, distortion_dict[topic_name[1:-6]])
+# Function to process and save a single message
+def process_message(topic_name, data, msg_type):
+    # Deserialize and convert the message to an OpenCV image
+    msg_ser = get_message(msg_type)
+    msg = deserialize_message(data, msg_ser)
+    if args.compressed and msg_type == "sensor_msgs/msg/CompressedImage":
+        np_arr = np.frombuffer(msg.data, np.uint8)
+        cv_img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+    else:
+        cv_img = bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
 
-        # Run detection on every twentieth image
-        if counter % 20 == 0:
-            detection_output = detect_objects(cv2_msg, WEIGHTS, output_file_path)
-            cars_count += detection_output
-            
-            """if detection_output == 1 and counter % 20 == 0:
-                if not cv2.imwrite(output_file_path, cv2_msg):
-                    raise Exception("Could not write image")"""
-        counter += 1
-        # print(counter)
+    # Undistort the image if required
+    if args.undistort:
+        cv_img = undistort(cv_img, distortion_dict[topic_name[1:-6]])
 
-        # Save Image
-        if args.verbose:
-            print('Saving ' + output_file_path)
-        
-        if counter % 100 == 0:
-            print(f"Processed {counter} Images")
+    return cv_img
 
-        if cars_count % 50 == 0 and cars_count > 0:
-            print(f"Processed cars {cars_count} Images")
+# Initialize output directories before processing messages
+output_directories = setup_output_directories(image_topics, OUTPUT_DIR)
 
-# check counters
-print("OUT OF LOOP")
-counter = counter / 20
-print("final car count is ", cars_count)
-print("final image count is ", counter)
+# Main processing loop
+while reader.has_next():
+    topic_name, data, timestamp = reader.read_next()
 
-# calculate percentage 
-if cars_count / counter > 0.05:
-    # Write the rosbag file path to a text file
+    if topic_name not in iterator:
+        continue
+
+    # Process message
+    msg_type = TYPE_MAP[topic_name]
+    cv_img = process_message(topic_name, data, msg_type)
+
+    # Handling image detection and saving
+    iterator[topic_name] += 1
+    
+    # Every 20th image (to reduce computation load), perform object detection on the image
+    if counter % 20 == 0:
+        detection_output = detect_objects(cv_img, WEIGHTS, output_file_path)
+        cars_count += detection_output
+
+    # Prepare output file path and save image
+    output_directory = output_directories[topic_name]
+    output_file_path = os.path.join(output_directory, f'Image_{iterator[topic_name]:010d}_{timestamp.sec}_{timestamp.nanosec}.jpg')
+    if args.verbose:    
+        print(f'Saving {output_file_path}')
+    cv2.imwrite(output_file_path, cv_img)
+
+    # Increment counters and print progress
+    counter += 1
+    if counter % 100 == 0 or cars_count % 50 == 0:
+        print(f"Processed {counter} Images, Detected {cars_count} Cars")
+
+# Final statistics and cleanup
+print("Final car count is", cars_count)
+print("Final image count is", counter)
+if cars_count / (counter / 20) > 0.05:
     with open("car_rosbag_paths.txt", "a") as file:
-        file.write(ROSBAG_FILE_PATH + "\n")
-        file.write(f"Total images (every 20): {counter} \n")
-        file.write(f"Car images (every 20): {cars_count} \n")
+        file.write(f"{ROSBAG_FILE_PATH}\nTotal images (every 20): {counter}\nCar images (every 20): {cars_count}\n")
     print("ROSBAG CONTAINS CARS")
 
 # Close the bag file
