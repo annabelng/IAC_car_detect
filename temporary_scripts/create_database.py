@@ -35,8 +35,11 @@ def main():
     print(env_vars)
     
     # Read path_to_your_database
-    database = os.path.join(root_folder, env_vars["ROSBAG_DATABASE_PATH"])
-    print("Database PATH:", database)
+    rosbag_database = os.path.join(root_folder, env_vars["ROSBAG_DATABASE_PATH"])
+    print("Rosbag Database PATH:", rosbag_database)
+
+    image_database = os.path.join(root_folder, env_vars["IMAGE_DATABASE_PATH"])
+    print("Image Database PATH:", image_database)
 
     sql_create_rosbag_metadata_table = """ CREATE TABLE IF NOT EXISTS RosbagMetadata (
                                         RosbagFolderPath TEXT PRIMARY KEY,
@@ -44,16 +47,42 @@ def main():
                                         PercentageCarImages REAL NOT NULL,
                                         TotalImages INTEGER NOT NULL,
                                         TotalCarImages INTEGER NOT NULL,
-                                        TrackType TEXT,
-                                        IsBroken BOOL
+                                        RacingTrackName TEXT,
+                                        IsBroken BOOL NOT NULL,
+                                        LastUpdated DATESTAMP NOT NULL,
+                                        Missing BOOL NOT NULL,
+                                        LastUpdatedBeforeMissing DATESTAMP
+                                    ); """
+    
+    sql_create_image_metadata_table = """ CREATE TABLE IF NOT EXISTS ImageMetadata (
+                                        ImageUniqueID INTEGER PRIMARY KEY,
+                                        XPosOfCar INTEGER,
+                                        YPosOfCar INTEGER,
+                                        TotalImages INTEGER,
+                                        TotalCarImages INTEGER,
+                                        WidthOfCar INTEGER,
+                                        HeightOfCar INTEGER,
+                                        LastUpdated DATETIME,
+                                        HasCar BOOL,
+                                        HumanVerified BOOL,
+                                        Device
                                     ); """
 
     # Create a database connection
-    conn = create_connection(database)
+    rosbag_conn = create_connection(rosbag_database)
 
-    # Create tables
-    if conn is not None:
-        create_table(conn, sql_create_rosbag_metadata_table)
+    # Create rosbag tables
+    if rosbag_conn is not None:
+        create_table(rosbag_conn, sql_create_rosbag_metadata_table)
+        print("Successfully Created Database!")
+    else:
+        print("Error! Cannot create the database connection.")
+
+    image_conn = create_connection(image_database)
+
+    # Create image tables
+    if image_conn is not None:
+        create_table(image_conn, sql_create_image_metadata_table)
         print("Successfully Created Database!")
     else:
         print("Error! Cannot create the database connection.")
