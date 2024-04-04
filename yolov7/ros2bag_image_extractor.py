@@ -20,6 +20,8 @@ from rosidl_runtime_py.utilities import get_message
 # Now you can import the modules from the yolov7 folder
 #from utils_detect import detect
 from onnx_inference import detect, letterbox
+from temporary_scripts.utils import load_env_variables
+from create_database import insert_entry, create_connection
 
 # ---------------------------------------------------------------------------- #
 #                                   Functions                                  #
@@ -182,7 +184,6 @@ else:
         '/vimba_front_right/image'          
     }
 
-
 TOPIC_TYPES = reader.get_all_topics_and_types()
 TYPE_MAP = {TOPIC_TYPES[i].name: TOPIC_TYPES[i].type for i in range(len(TOPIC_TYPES))}
 
@@ -251,9 +252,11 @@ while reader.has_next():
     iterator[topic_name] += 1
     
     # Every 20th image (to reduce computation load), perform object detection on the image
-    if counter % 20 == 0:
-        detection_output = detect_objects(cv_img, WEIGHTS, output_file_path)
-        cars_count += detection_output
+    #if counter % 20 == 0:
+
+    # Run detection every image
+    detection_output = detect_objects(cv_img, WEIGHTS, output_file_path)
+    cars_count += detection_output
 
     # Prepare output file path and save image
     output_directory = output_directories[topic_name]
@@ -267,10 +270,31 @@ while reader.has_next():
     if counter % 100 == 0 or cars_count % 50 == 0:
         print(f"Processed {counter} Images, Detected {cars_count} Cars")
 
+percentage = cars_count / counter
+# ----------------------------- INSERT INTO ROSBAG DATABASE ---------------------------- #
+
+root_folder = os.path.join(os.path.dirname(__file__), '..')
+
+# Load variables from .env file
+env_vars = load_env_variables()
+print(env_vars)
+
+# Read path_to_your_database
+rosbag_database = os.path.join(root_folder, env_vars["ROSBAG_DATABASE_PATH"])
+print("Rosbag Database PATH:", rosbag_database)
+rosbag_conn = create_connection(rosbag_database)
+
+new_entry = (123456, ROSBAG_FILE_PATH, 1, percentage, counter, cars_count, 'Track XYZ', False, '2024-04-03', False, None)
+insert_entry(new_entry)
+rosbag_conn.close()
+
+print("Inserted 1 database entry")
+# -------------------------------------------------------------------------------------- #
+
 # Final statistics and cleanup
 print("Final car count is", cars_count)
 print("Final image count is", counter)
-if cars_count / (counter / 20) > 0.05:
+if percentage > 0.05:
     with open("car_rosbag_paths.txt", "a") as file:
         file.write(f"{ROSBAG_FILE_PATH}\nTotal images (every 20): {counter}\nCar images (every 20): {cars_count}\n")
     print("ROSBAG CONTAINS CARS")

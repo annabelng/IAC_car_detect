@@ -8,7 +8,7 @@ VERBOSE_DEFAULT=0
 UNDISTORT_DEFAULT=0
 # CALIB_DIR_DEFAULT="/home/roar/ART/perception/Camera/Calibration_new/"
 #CALIB_DIR_DEFAULT="/home/art-berk/IAC_dataset_maker/putnam_calib/"
-OUTPUT_BASE_DIR_DEFAULT="/home/annabelng/Desktop/rosbag_detections/"
+OUTPUT_BASE_DIR_DEFAULT="/home/annabelng/Desktop/rosbag_db/"
 MAKE_VID_DEFAULT=1
 USE_COMPRESSED_DEFAULT=0
 
