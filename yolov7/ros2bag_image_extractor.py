@@ -1,3 +1,8 @@
+# ---------------------------------------------------------------------------- #
+#                                    Imports                                   #
+# ---------------------------------------------------------------------------- #
+
+# ------------------------- System related Libraries ------------------------- #
 import os
 import sys
 import argparse
@@ -20,9 +25,8 @@ from rosidl_runtime_py.utilities import get_message
 # Now you can import the modules from the yolov7 folder
 #from utils_detect import detect
 from onnx_inference import detect, letterbox
-from temporary_scripts.utils import load_env_variables
-from create_database import insert_entry, create_connection
-
+from create_database import create_table, create_connection, insert_entry
+from db_utils import load_env_variables
 # ---------------------------------------------------------------------------- #
 #                                   Functions                                  #
 # ---------------------------------------------------------------------------- #
@@ -184,6 +188,7 @@ else:
         '/vimba_front_right/image'          
     }
 
+
 TOPIC_TYPES = reader.get_all_topics_and_types()
 TYPE_MAP = {TOPIC_TYPES[i].name: TOPIC_TYPES[i].type for i in range(len(TOPIC_TYPES))}
 
@@ -203,74 +208,64 @@ if len(iterator) == 0:
 counter = 0
 cars_count = 0
 
-# Function to create output directories for topics
-def setup_output_directories(image_topics, output_dir):
-    output_directories = {}
-    for topic in image_topics:
-        # Format the output topic directory name
-        output_topic = topic[1:-6] if not args.compressed else topic[7:-17]
-        output_directory = os.path.join(output_dir, output_topic)
-        if not os.path.exists(output_directory):
-            os.makedirs(output_directory, exist_ok=True)
-            if args.verbose:
-                print(f"Created directory: {output_directory}")
-        output_directories[topic] = output_directory
-    return output_directories
-
-# Function to process and save a single message
-def process_message(topic_name, data, msg_type):
-    # Deserialize and convert the message to an OpenCV image
-    msg_ser = get_message(msg_type)
-    msg = deserialize_message(data, msg_ser)
-    if args.compressed and msg_type == "sensor_msgs/msg/CompressedImage":
-        np_arr = np.frombuffer(msg.data, np.uint8)
-        cv_img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-    else:
-        cv_img = bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-
-    # Undistort the image if required
-    if args.undistort:
-        cv_img = undistort(cv_img, distortion_dict[topic_name[1:-6]])
-
-    return cv_img
-
-# Initialize output directories before processing messages
-output_directories = setup_output_directories(image_topics, OUTPUT_DIR)
-
-# Main processing loop
 while reader.has_next():
-    topic_name, data, timestamp = reader.read_next()
-
-    if topic_name not in iterator:
-        continue
-
-    # Process message
-    msg_type = TYPE_MAP[topic_name]
-    cv_img = process_message(topic_name, data, msg_type)
-
-    # Handling image detection and saving
-    iterator[topic_name] += 1
     
-    # Every 20th image (to reduce computation load), perform object detection on the image
-    #if counter % 20 == 0:
+    # Read the next message
+    topic_name, data, timestamp = reader.read_next()
+    
+    if topic_name in iterator.keys():
+        # Update iterator for this topic
+        iterator[topic_name] += 1
 
-    # Run detection every image
-    detection_output = detect_objects(cv_img, WEIGHTS, output_file_path)
-    cars_count += detection_output
+        # Extract message from rosbag
+        msg_type = TYPE_MAP[topic_name]
+        msg_ser = get_message(msg_type)
+        msg = deserialize_message(data, msg_ser)
+        output_topic = None
+        if (args.compressed and msg_type == "sensor_msgs/msg/CompressedImage"):
+            np_arr = np.frombuffer(msg.data, np.uint8)
+            cv2_msg = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            output_topic = topic_name[7:-17]
+        else:
+            # Convert to cv2 image
+            cv2_msg = bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            output_topic = topic_name[1:-6]
 
-    # Prepare output file path and save image
-    output_directory = output_directories[topic_name]
-    output_file_path = os.path.join(output_directory, f'Image_{iterator[topic_name]:010d}_{timestamp.sec}_{timestamp.nanosec}.jpg')
-    if args.verbose:    
-        print(f'Saving {output_file_path}')
-    cv2.imwrite(output_file_path, cv_img)
+        # Create a directory for topic in output dir if it does not exist
+        # print("Output Topic: ", output_topic)
+        output_directory = os.path.join(OUTPUT_DIR, output_topic)
+        
+        if not os.path.exists(output_directory):
+            if args.verbose:
+                print("Creating Directory: ", output_directory)
+            os.mkdir(output_directory)
 
-    # Increment counters and print progress
-    counter += 1
-    if counter % 100 == 0 or cars_count % 50 == 0:
-        print(f"Processed {counter} Images, Detected {cars_count} Cars")
+        output_file_path = os.path.join(output_directory, 'Image' + '_' + '{0:010d}'.format(iterator[topic_name]) + '_' + str(msg.header.stamp.sec) + '_' + str(msg.header.stamp.nanosec) + '.jpg')
+
+        # Run detection on every twentieth image
+        if counter % 20 == 0:
+            detection_output = detect_objects(cv2_msg, WEIGHTS, output_file_path)
+            cars_count += detection_output
+            
+            """if detection_output == 1 and counter % 20 == 0:
+                if not cv2.imwrite(output_file_path, cv2_msg):
+                    raise Exception("Could not write image")"""
+            
+        counter += 1
+        # print(counter)
+
+        # Save Image
+        if args.verbose:
+            print('Saving ' + output_file_path)
+        
+        if counter % 100 == 0:
+            print(f"Processed {counter} Images")
+
+        if cars_count % 50 == 0 and cars_count > 0:
+            print(f"Processed cars {cars_count} Images")
 
 percentage = cars_count / counter
+
 # ----------------------------- INSERT INTO ROSBAG DATABASE ---------------------------- #
 
 root_folder = os.path.join(os.path.dirname(__file__), '..')
@@ -285,19 +280,48 @@ print("Rosbag Database PATH:", rosbag_database)
 rosbag_conn = create_connection(rosbag_database)
 
 new_entry = (123456, ROSBAG_FILE_PATH, 1, percentage, counter, cars_count, 'Track XYZ', False, '2024-04-03', False, None)
-insert_entry(new_entry)
+insert_entry(rosbag_conn, new_entry)
 rosbag_conn.close()
 
 print("Inserted 1 database entry")
 # -------------------------------------------------------------------------------------- #
 
-# Final statistics and cleanup
-print("Final car count is", cars_count)
-print("Final image count is", counter)
+
+# check counters
+print("OUT OF LOOP")
+counter = counter / 20
+print("final car count is ", cars_count)
+print("final image count is ", counter)
+
+# calculate percentage 
 if percentage > 0.05:
+    # Write the rosbag file path to a text file
     with open("car_rosbag_paths.txt", "a") as file:
-        file.write(f"{ROSBAG_FILE_PATH}\nTotal images (every 20): {counter}\nCar images (every 20): {cars_count}\n")
+        file.write(ROSBAG_FILE_PATH + "\n")
+        file.write(f"Total images (every 20): {counter} \n")
+        file.write(f"Car images (every 20): {cars_count} \n")
     print("ROSBAG CONTAINS CARS")
 
 # Close the bag file
+output_video_path = os.path.join(OUTPUT_DIR, 'validation_video.mp4')
+input_video_path = os.path.join(OUTPUT_DIR, 'front_right_center')
+ffmpeg_command = [
+    "ffmpeg",
+    "-framerate", "20",
+    "-pattern_type", "glob",
+    "-i", f"{input_video_path}/*.jpg",
+    "-c:v", "libx264",
+    "-profile:v", "high",
+    "-crf", "20",
+    "-pix_fmt", "yuv420p",
+    output_video_path
+]
+
+try:
+    print("Creating video from masks...")
+    subprocess.run(ffmpeg_command, check=True)
+    print("Video created successfully:", output_video_path)
+except subprocess.CalledProcessError as e:
+    print("Failed to create video from masks:", e)
+
 del reader
