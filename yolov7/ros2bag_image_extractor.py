@@ -8,6 +8,8 @@ import sys
 import argparse
 import yaml
 import subprocess
+import hashlib
+import datetime
 
 # ----------------------------- Common Libraries ----------------------------- #
 import numpy as np
@@ -67,6 +69,29 @@ def detect_objects(cv_img, weights_path, output_file_path):
     num_cars = detect(cv_img, weights_path, output_file_path)
     return num_cars
 
+# ------------------------------ YAML metadata parsing ----------------------------- #
+def create_uuid(yaml_file):
+    # Load YAML data from file
+    with open(yaml_file, 'r') as stream:
+        data = yaml.safe_load(stream)
+
+    # Extract the value of the field
+    nanoseconds_since_epoch = data['rosbag_info']['starting_time']['nanoseconds_since_epoch']
+
+    total_length = data['rosbag_info']['duration']['nanoseconds']
+
+    # Convert nanoseconds_since_epoch to a string
+    nanoseconds_str = str(nanoseconds_since_epoch)
+
+    # Calculate the SHA-256 hash
+    sha256_hash = hashlib.sha256(nanoseconds_str.encode()).hexdigest()
+
+    return sha256_hash, total_length
+
+
+
+
+    
 # ---------------------------------------------------------------------------- #
 #                           Setup & Argument Handling                          #
 # ---------------------------------------------------------------------------- #
@@ -75,6 +100,7 @@ arg_parser  = argparse.ArgumentParser(description='Extracts Images from ROS2 Bag
 # ------------------------------- Add Arguments ------------------------------ #
 arg_parser.add_argument('rosbag_file_path', help='Path to rosbag to extract the data from', type=dir_path)
 arg_parser.add_argument('output_dir', help='Path to directory where extracted data should be stored', type=dir_path)
+arg_parser.add_argument('time_since_epoch', help = "number of seconds since epoch")
 arg_parser.add_argument('-u', "--undistort", action="store_true")
 arg_parser.add_argument('-c', "--compressed", action="store_false")
 arg_parser.add_argument('-p', '--camera_info_path', help="Path to folder containing yaml config files for camera info for all cameras", type=dir_path)
@@ -136,6 +162,10 @@ for file in files:
     if file.endswith(".db3"):
         store_type = "sqlite3"
         print("[script] Detected Input bag is a db3 file.")
+
+    elif file.endswith(".yaml"):
+        # process yaml file 
+        rosbag_uuid, total_length = create_uuid(file)
         
     elif file.endswith(".mcap"):
         store_type = "mcap"
@@ -277,10 +307,13 @@ print(env_vars)
 # Read path_to_your_database
 rosbag_database = os.path.join(root_folder, env_vars["ROSBAG_DATABASE_PATH"])
 print("Rosbag Database PATH:", rosbag_database)
-rosbag_conn = create_connection(rosbag_database)
+rosbag_conn, table_name = create_connection(rosbag_database)
 
-new_entry = (123456, ROSBAG_FILE_PATH, 1, percentage, counter, cars_count, 'Track XYZ', False, '2024-04-03', False, None)
-insert_entry(rosbag_conn, new_entry)
+today = datetime.date.today()
+formatted_date = today.strftime("%d-%m-%Y")
+
+new_entry = (rosbag_uuid, ROSBAG_FILE_PATH, total_length, percentage, counter, cars_count, None, False, today.strftime("%Y-%d-%m"), False, None)
+insert_entry(rosbag_conn, new_entry, table_name)
 rosbag_conn.close()
 
 print("Inserted 1 database entry")
