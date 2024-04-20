@@ -340,7 +340,7 @@ today = datetime.date.today()
 formatted_date = today.strftime("%d-%m-%Y")
 print(formatted_date)
 print(f"total num: {counter}")
-
+c
 counter = math.ceil(counter/20)
 percentage = cars_count / counter
 print(f"percentage: {percentage}")
