@@ -17,6 +17,7 @@ import cv2
 
 # --------------------------- ROS related Libraries -------------------------- #
 from cv_bridge import CvBridge
+from contextlib import contextmanager
 
 import rosbag2_py
 
@@ -27,12 +28,23 @@ from rosidl_runtime_py.utilities import get_message
 # Now you can import the modules from the yolov7 folder
 #from utils_detect import detect
 from onnx_inference import detect, letterbox
-from create_database import create_table, create_connection, insert_entry
+from create_database import create_table, create_connection, insert_entry, insert_or_update_entry, update_entry
 from db_utils import load_env_variables
 # ---------------------------------------------------------------------------- #
 #                                   Functions                                  #
 # ---------------------------------------------------------------------------- #
 
+# ---------------------------- Suppress messages ----------------------------- #
+
+@contextmanager
+def suppress_stdout():
+    with open(os.devnull, "w") as devnull:
+        old_stdout = sys.stdout
+        sys.stdout = devnull
+        try:  
+            yield
+        finally:
+            sys.stdout = old_stdout
 # ------------------------ Check if directory is valid ----------------------- #
 def dir_path(string):
     print(string)
@@ -76,9 +88,9 @@ def create_uuid(yaml_file):
         data = yaml.safe_load(stream)
 
     # Extract the value of the field
-    nanoseconds_since_epoch = data['rosbag_info']['starting_time']['nanoseconds_since_epoch']
+    nanoseconds_since_epoch = data['rosbag2_bagfile_information']['starting_time']['nanoseconds_since_epoch']
 
-    total_length = data['rosbag_info']['duration']['nanoseconds']
+    total_length = data['rosbag2_bagfile_information']['duration']['nanoseconds']
 
     # Convert nanoseconds_since_epoch to a string
     nanoseconds_str = str(nanoseconds_since_epoch)
@@ -87,9 +99,6 @@ def create_uuid(yaml_file):
     sha256_hash = hashlib.sha256(nanoseconds_str.encode()).hexdigest()
 
     return sha256_hash, total_length
-
-
-
 
     
 # ---------------------------------------------------------------------------- #
@@ -100,9 +109,8 @@ arg_parser  = argparse.ArgumentParser(description='Extracts Images from ROS2 Bag
 # ------------------------------- Add Arguments ------------------------------ #
 arg_parser.add_argument('rosbag_file_path', help='Path to rosbag to extract the data from', type=dir_path)
 arg_parser.add_argument('output_dir', help='Path to directory where extracted data should be stored', type=dir_path)
-arg_parser.add_argument('time_since_epoch', help = "number of seconds since epoch")
 arg_parser.add_argument('-u', "--undistort", action="store_true")
-arg_parser.add_argument('-c', "--compressed", action="store_false")
+arg_parser.add_argument('-c', "--compressed", action="store_true")
 arg_parser.add_argument('-p', '--camera_info_path', help="Path to folder containing yaml config files for camera info for all cameras", type=dir_path)
 arg_parser.add_argument('-v', "--verbose", action="store_true")
 
@@ -159,13 +167,15 @@ bridge = CvBridge()
 files = os.listdir(ROSBAG_FILE_PATH)
 print(f"[script] ROSBAG filepath: {ROSBAG_FILE_PATH}")
 for file in files:
+    file_path = os.path.join(ROSBAG_FILE_PATH, file)
+    print(file_path)
     if file.endswith(".db3"):
         store_type = "sqlite3"
         print("[script] Detected Input bag is a db3 file.")
 
     elif file.endswith(".yaml"):
         # process yaml file 
-        rosbag_uuid, total_length = create_uuid(file)
+        rosbag_uuid, total_length = create_uuid(file_path)
         
     elif file.endswith(".mcap"):
         store_type = "mcap"
@@ -192,6 +202,8 @@ except Exception as e:
 
 # Check if there are images in the ROSBAG, if not, skip!
 # Get all the topic types and 
+print(f"ARGUMENTS of compressed {args.compressed}")
+print(f"ARGUMENTS of undistort {args.undistort}")
 if args.compressed:
 
     image_topics = {
@@ -212,22 +224,36 @@ else:
     image_topics = {
         #'/vimba_rear_left/image'            ,
         #'/vimba_rear_right/image'           ,
-        '/vimba_front_left/image'           ,
+        # '/vimba_front_left/image'           ,
         '/vimba_front_left_center/image'    ,
         '/vimba_front_right_center/image'   ,
-        '/vimba_front_right/image'          
+        # '/vimba_front_right/image'          
     }
 
 
 TOPIC_TYPES = reader.get_all_topics_and_types()
 TYPE_MAP = {TOPIC_TYPES[i].name: TOPIC_TYPES[i].type for i in range(len(TOPIC_TYPES))}
 
-iterator = dict()
+# Implement Logic here:
+topic_to_check = None
+for t in image_topics:
+    if t in TYPE_MAP:
+        topic_to_check = t
+        break
+    
+print(topic_to_check)
+if topic_to_check == None and topic_to_check != '/vimba_front_left_center/image' and topic_to_check != '/vimba_front_right_center/image':
+    print(f"Error in topics, doesn't exist {topic_to_check}")
+    exit(0)
 
-# Initialize an iterator based on whether or not the topic is in the rosbag
-for t in TYPE_MAP:
-    if t in image_topics:
-        iterator[t] = 0
+iterator = dict()
+iterator[topic_to_check] = 0
+print(f"topic: {topic_to_check}")
+
+# # Initialize an iterator based on whether or not the topic is in the rosbag
+# for t in TYPE_MAP:
+#     if t in image_topics:
+#         iterator[t] = 0
 
 if len(iterator) == 0:
     print("[script] No Images to extract from this rosbag. Exiting...")
@@ -271,11 +297,12 @@ while reader.has_next():
             os.mkdir(output_directory)
 
         output_file_path = os.path.join(output_directory, 'Image' + '_' + '{0:010d}'.format(iterator[topic_name]) + '_' + str(msg.header.stamp.sec) + '_' + str(msg.header.stamp.nanosec) + '.jpg')
-
+        
         # Run detection on every twentieth image
         if counter % 20 == 0:
-            detection_output = detect_objects(cv2_msg, WEIGHTS, output_file_path)
-            cars_count += detection_output
+            with suppress_stdout():
+                detection_output = detect_objects(cv2_msg, WEIGHTS, output_file_path)
+                cars_count += detection_output
             
             """if detection_output == 1 and counter % 20 == 0:
                 if not cv2.imwrite(output_file_path, cv2_msg):
@@ -294,7 +321,6 @@ while reader.has_next():
         if cars_count % 50 == 0 and cars_count > 0:
             print(f"Processed cars {cars_count} Images")
 
-percentage = cars_count / counter
 
 # ----------------------------- INSERT INTO ROSBAG DATABASE ---------------------------- #
 
@@ -307,22 +333,26 @@ print(env_vars)
 # Read path_to_your_database
 rosbag_database = os.path.join(root_folder, env_vars["ROSBAG_DATABASE_PATH"])
 print("Rosbag Database PATH:", rosbag_database)
-rosbag_conn, table_name = create_connection(rosbag_database)
+rosbag_conn = create_connection(rosbag_database)
 
 today = datetime.date.today()
 formatted_date = today.strftime("%d-%m-%Y")
+print(formatted_date)
+print(f"total num: {counter}")
 
-new_entry = (rosbag_uuid, ROSBAG_FILE_PATH, total_length, percentage, counter, cars_count, None, False, today.strftime("%Y-%d-%m"), False, None)
-insert_entry(rosbag_conn, new_entry, table_name)
+counter = counter/20
+percentage = cars_count / counter
+print(f"percentage: {percentage}")
+print(f"UUID: {rosbag_uuid}")
+new_entry = (rosbag_uuid, ROSBAG_FILE_PATH, total_length, percentage, counter, cars_count, "TRACK XYZ", False, today.strftime("%Y-%m-%d"), False, today.strftime("%Y-%m-%d"))
+insert_or_update_entry(rosbag_conn, new_entry, "rosbag_info")
 rosbag_conn.close()
 
 print("Inserted 1 database entry")
 # -------------------------------------------------------------------------------------- #
 
-
 # check counters
 print("OUT OF LOOP")
-counter = counter / 20
 print("final car count is ", cars_count)
 print("final image count is ", counter)
 
@@ -336,8 +366,12 @@ if percentage > 0.05:
     print("ROSBAG CONTAINS CARS")
 
 # Close the bag file
+print(topic_to_check)
+print(topic_to_check[1:-6])
 output_video_path = os.path.join(OUTPUT_DIR, 'validation_video.mp4')
-input_video_path = os.path.join(OUTPUT_DIR, 'front_right_center')
+input_video_path = os.path.join(OUTPUT_DIR, topic_to_check[1:-6])
+print(input_video_path)
+
 ffmpeg_command = [
     "ffmpeg",
     "-framerate", "20",
