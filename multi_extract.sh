@@ -3,14 +3,14 @@
 # ---------------------------------------------------------------------------- #
 #                               DEFAULT VARIABLES                              #
 # ---------------------------------------------------------------------------- #
-DATA_DIR_DEFAULT="/mnt/nas/Archive_earlier_than_2024/Chris_short_bags/Rosbags/"
+DATA_DIR_DEFAULT="/mnt/roar_shared_disk/YOLO_datasets/annabel/jeep_bags"
 VERBOSE_DEFAULT=0
 UNDISTORT_DEFAULT=0
 # CALIB_DIR_DEFAULT="/home/roar/ART/perception/Camera/Calibration_new/"
 #CALIB_DIR_DEFAULT="/home/art-berk/IAC_dataset_maker/putnam_calib/"
-OUTPUT_BASE_DIR_DEFAULT="/home/annabelng/Desktop/rosbag_db_test/"
+OUTPUT_BASE_DIR_DEFAULT="/home/annabelng/Desktop/rosbag_db_test2/"
 MAKE_VID_DEFAULT=1
-USE_COMPRESSED_DEFAULT=0
+USE_COMPRESSED_DEFAULT=
 
 # ---------------------------------------------------------------------------- #
 #                          PARSE ENVIRONMENT VARIABLES                         #
@@ -122,6 +122,7 @@ sleep 2s
 # find "$DATA_DIR" \( -iname "*.db3" -o -iname "*.mcap" \) -print0 | xargs -0 -I file dirname file | sort -u | while IFS= read -r d; do
 #     echo "$d"
 # done
+
 find "$DATA_DIR" \( -iname "*.db3" -o -iname "*.mcap" \) -print0 | xargs -0 -I file dirname file | sort -u > /tmp/tempfile.txt
 
 
@@ -153,29 +154,29 @@ while IFS= read -r line; do
     if [ $VERBOSE -eq 1 ]; then
         if [ $UNDISTORT -eq 1 ]; then
             if [ $USE_COMPRESSED -eq 1 ]; then
-                python3 yolov7/ros2bag_image_extractor.py "$line" "$OUTPUT_DIR" -vucp "$CALIB_DIR"
+                python3 yolov7/ros2bag_image_extractor.py "$line" "$OUTPUT_DIR" -vucp "$CALIB_DIR" 
             else 
-                python3 yolov7/ros2bag_image_extractor.py "$line" "$OUTPUT_DIR" -vup "$CALIB_DIR"
+                python3 yolov7/ros2bag_image_extractor.py "$line" "$OUTPUT_DIR" -vup "$CALIB_DIR" 
             fi
         else 
             if [ $USE_COMPRESSED -eq 1 ]; then
-                python3 yolov7/ros2bag_image_extractor.py "$line" "$OUTPUT_DIR" -vc
+                python3 yolov7/ros2bag_image_extractor.py "$line" "$OUTPUT_DIR" -vc 
             else
-                python3 yolov7/ros2bag_image_extractor.py "$line" "$OUTPUT_DIR" -v
+                python3 yolov7/ros2bag_image_extractor.py "$line" "$OUTPUT_DIR" -v 
             fi
         fi
     else
         if [ $UNDISTORT -eq 1 ]; then
             if [ $USE_COMPRESSED -eq 1 ]; then
-                python3 yolov7/ros2bag_image_extractor.py "$line" "$OUTPUT_DIR" -ucp "$CALIB_DIR"
+                python3 yolov7/ros2bag_image_extractor.py "$line" "$OUTPUT_DIR" -ucp "$CALIB_DIR" 
             else 
-                python3 yolov7/ros2bag_image_extractor.py "$line" "$OUTPUT_DIR" -up "$CALIB_DIR"
+                python3 yolov7/ros2bag_image_extractor.py "$line" "$OUTPUT_DIR" -up "$CALIB_DIR" 
             fi
         else
             if [ $USE_COMPRESSED -eq 1 ]; then
                 python3 yolov7/ros2bag_image_extractor.py "$line" "$OUTPUT_DIR" -c
             else
-                python3 yolov7/ros2bag_image_extractor.py "$line" "$OUTPUT_DIR"
+                python3 yolov7/ros2bag_image_extractor.py "$line" "$OUTPUT_DIR" 
             fi
         fi
     fi

@@ -10,6 +10,7 @@ import onnxruntime as ort
 from PIL import Image
 from pathlib import Path
 from collections import OrderedDict,namedtuple
+import warnings
 
 # letterbox to preprocess images
 def letterbox(im, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleup=True, stride=32):
@@ -66,6 +67,8 @@ def detect(img, weights_path, output_file_path):
     inname = [i.name for i in session.get_inputs()]
     inp = {inname[0]:im}
 
+    # Suppress all warnings
+    warnings.filterwarnings("ignore")
     # ONNX inference
     outputs = session.run(outname, inp)[0]
 

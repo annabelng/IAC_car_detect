@@ -10,6 +10,7 @@ import yaml
 import subprocess
 import hashlib
 import datetime
+import math
 
 # ----------------------------- Common Libraries ----------------------------- #
 import numpy as np
@@ -340,7 +341,7 @@ formatted_date = today.strftime("%d-%m-%Y")
 print(formatted_date)
 print(f"total num: {counter}")
 
-counter = counter/20
+counter = math.ceil(counter/20)
 percentage = cars_count / counter
 print(f"percentage: {percentage}")
 print(f"UUID: {rosbag_uuid}")
